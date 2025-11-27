@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Backlog Smart Game Randomizer — Naiana</title>
+  <style>
+    /* ====== BASIC THEME ====== */
+    :root{
+      --bg:#0b0b10; --card:#0f1720; --muted:#9aa3b2;
+      --accent:#7b5cff; --accent-2:#5c4bd6; --glass: rgba(255,255,255,0.03);
+      --success:#22c55e;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(180deg,#07070a 0%, #0b0b10 100%);
+      color:#e6eef8; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      display:flex; align-items:flex-start; justify-content:center; padding:28px;
+    }
+    .wrap{width:100%;max-width:1100px}
+    header{display:flex;align-items:center;gap:18px;margin-bottom:18px}
+    .logo{
+      width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:white;box-shadow:0 6px 20px rgba(20,10,60,0.5)
+    }
+    h1{font-size:20px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    /* LAYOUT */
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:20px}
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 30px rgba(2,6,23,0.6)
+    }
+
+    /* FILTERS */
+    .filters{display:flex;flex-direction:column;gap:10px}
+    .row{display:flex;gap:8px}
+    select,input[type=range]{flex:1;padding:10px;background:var(--glass);border-radius:8px;border:1px solid rgba(255,255,255,0.04);color:inherit}
+    button.btn{padding:12px 14px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:600;cursor:pointer}
+    button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    .tiny{padding:8px 10px;font-size:13px;border-radius:8px}
+
+    /* RESULT */
+    .result{
+      display:flex;align-items:center;gap:16px; padding:14px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03)
+    }
+    .result .meta{font-size:14px;color:var(--muted)}
+    .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03);font-weight:600}
+
+    /* TABLE */
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+    th,td{padding:8px 10px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03)}
+    th{color:var(--muted);font-weight:600;font-size:12px}
+    .small{font-size:12px;color:var(--muted)}
+
+    /* MISC */
+    .muted{color:var(--muted)}
+    .hidden{display:none}
+    .center{display:flex;justify-content:center;align-items:center}
+    .spinner{width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.08);border-top-color:var(--accent);animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* RESPONSIVE */
+    @media (max-width:920px){.grid{grid-template-columns:1fr;}}
+    .explain{font-size:13px;color:var(--muted);margin-top:8px}
+    .footer{margin-top:14px;color:var(--muted);font-size:13px}
+    .reason{margin-top:8px;color:#bcd0ff;background:rgba(123,92,255,0.06);padding:10px;border-radius:8px}
+    .control-row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">N</div>
+      <div>
+        <h1>Backlog Smart Game Randomizer</h1>
+        <p class="lead">Import your backlog (Google Sheets) and let the weighted randomizer pick your next game.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: CONTROLS -->
+      <div class="panel">
+        <strong>Data source</strong>
+        <p class="small muted">Uses your Google Sheet CSV export. Must be set to "Anyone with the link" (Viewer).</p>
+        <div style="margin-top:8px" class="row">
+          <input id="sheetUrl" placeholder="Google Sheets CSV URL" value="https://docs.google.com/spreadsheets/d/1q7vzk_9xK7ok8UIR-UNWS1iUYIEVPZJjy08MEF0_qKg/export?format=csv" />
+          <button id="loadBtn" class="tiny btn">Load</button>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <strong>Filters</strong>
+        <div class="filters" style="margin-top:8px">
+          <div class="row">
+            <select id="platformFilter"><option value="">All platforms</option></select>
+            <select id="statusFilter"><option value="">All status</option></select>
+          </div>
+
+          <div class="row">
+            <select id="genreFilter"><option value="">All genres</option></select>
+            <select id="priorityFilter"><option value="">Any priority</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
+          </div>
+
+          <div class="row">
+            <select id="timeCat"><option value="">Any length</option><option value="Short">Short (&lt;10h)</option><option value="Medium">Medium (10–30h)</option><option value="Long">Long (&gt;30h)</option></select>
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="onlyStarted" /> Only started (>0%)</label>
+          </div>
+
+          <div style="margin-top:8px" class="control-row">
+            <button id="rollBtn" class="btn">🎲 ROLL</button>
+            <button id="refreshBtn" class="secondary tiny">⟳ Refresh</button>
+            <button id="exportBtn" class="secondary tiny">Export CSV</button>
+          </div>
+
+          <div class="explain">Weights example: <span class="chip">Currently Playing +5</span> <span class="chip">High priority +4</span> <span class="chip">Completion bonus</span></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <strong>Quick stats</strong>
+          <div id="stats" class="muted small" style="margin-top:6px">No data loaded yet</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: RANDOMIZER + TABLE -->
+      <div class="panel">
+        <div id="resultArea" class="hidden">
+          <div class="result">
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
+                <div>
+                  <div id="resTitle" style="font-size:18px;font-weight:700"></div>
+                  <div class="meta small" id="resMeta"></div>
+                </div>
+                <div id="resBadge" class="badge">Picked</div>
+              </div>
+
+              <div id="resReason" class="reason small"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <strong>Full list</strong>
+          <div style="margin-top:8px">
+            <input id="searchQ" placeholder="Search title or platform..." style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:var(--glass);color:inherit" />
+            <div id="tableWrap" style="margin-top:8px;max-height:430px;overflow:auto">
+              <table id="gamesTable"><thead><tr><th>Title</th><th>Platform</th><th>Genre</th><th>Time</th><th>Interest</th><th>Priority</th><th>%</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">Tip: use filters + "Only started" to finish games you already began.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /***** CONFIG *****/
+    const DEFAULT_SHEET_CSV = document.getElementById('sheetUrl').value.trim();
+
+    /***** STATE *****/
+    let RAW = [];        // original parsed rows as objects
+    let DATA = [];       // normalized row objects used by app
+    let FILTERED = [];   // after filters
+    const requiredFields = ['Title']; // minimal expectation
+
+    /***** UTIL: CSV parse (basic, robust) *****/
+    function parseCSV(text){
+      const rows = [];
+      const lines = text.split(/\r\n|\n/).filter(Boolean);
+      if(lines.length === 0) return rows;
+      // naive split but handles quoted fields
+      const headers = splitRow(lines[0]);
+      for(let i=1;i<lines.length;i++){
+        const cols = splitRow(lines[i]);
+        const obj = {};
+        for(let j=0;j<headers.length;j++){
+          obj[ headers[j].trim() || ('col'+j) ] = (cols[j] != null ? cols[j].trim() : '');
+        }
+        rows.push(obj);
+      }
+      return rows;
+
+      function splitRow(line){
+        const out=[]; let cur=''; let inQuote=false;
+        for(let k=0;k<line.length;k++){
+          const ch=line[k];
+          if(ch==='\"'){ inQuote = !inQuote; continue; }
+          if(ch===',' && !inQuote){ out.push(cur); cur=''; continue; }
+          cur += ch;
+        }
+        out.push(cur);
+        return out;
+      }
+    }
+
+    /***** NORMALIZE rows into game objects with safe keys *****/
+    function normalizeRows(rows){
+      return rows.map(r => {
+        // common column names detection (case-insensitive)
+        const mapKey = (names) => {
+          for(const n of names){
+            for(const k of Object.keys(r)){
+              if(k.toLowerCase().replace(/\s+/g,'') === n.toLowerCase().replace(/\s+/g,'')) return k;
+            }
+          }
+          return null;
+        };
+
+        const titleKey = mapKey(['title','game','game title','name']) || Object.keys(r)[0];
+        const platformKey = mapKey(['platform','console']) || '';
+        const statusKey = mapKey(['status','state']) || '';
+        const interestKey = mapKey(['interest','will to play','willtoplay']) || '';
+        const completionKey = mapKey(['completion %','completion','% complete','percent']) || mapKey(['completion%','completionpercent']) || '';
+        const timeKey = mapKey(['duration','est. time','time','hours','estimatedtime']) || '';
+        const genreKey = mapKey(['genre','category','main genre']) || '';
+        const priorityKey = mapKey(['priority']) || '';
+
+        const title = (r[titleKey]||'').toString();
+        const platform = (platformKey ? r[platformKey] : '') || '';
+        const status = (statusKey ? r[statusKey] : '') || '';
+        const interest = (interestKey ? r[interestKey] : '') || '';
+        const completionRaw = (completionKey ? r[completionKey] : '') || '';
+        const timeRaw = (timeKey ? r[timeKey] : '') || '';
+        const genre = (genreKey ? r[genreKey] : '') || '';
+        const priority = (priorityKey ? r[priorityKey] : '') || '';
+
+        // normalize numbers
+        const completion = parseFloat(String(completionRaw).replace('%','').replace(',','.')) || 0;
+        // try to extract numeric hours from timeRaw (like "10h" or "10")
+        let hours = 0;
+        if(typeof timeRaw === 'number') hours = timeRaw;
+        else {
+          const m = (''+timeRaw).match(/(\d+(\.\d+)?)/);
+          hours = m ? parseFloat(m[0]) : 0;
+        }
+        // duration category
+        let durationCat = '';
+        if(hours>0 && hours<10) durationCat='Short';
+        else if(hours>=10 && hours<=30) durationCat='Medium';
+        else if(hours>30) durationCat='Long';
+
+        return {
+          Title: title,
+          Platform: platform,
+          Status: status,
+          Interest: capitalize(interest),
+          Completion: completion,
+          Hours: hours,
+          TimeRaw: timeRaw,
+          DurationCat: durationCat,
+          Genre: genre,
+          Priority: capitalize(priority),
+          _raw: r
+        };
+      });
+    }
+
+    function capitalize(v){ if(!v) return ''; v = ''+v; return v.charAt(0).toUpperCase()+v.slice(1); }
+
+    /***** FETCH sheet CSV *****/
+    async function fetchSheetCsv(url){
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('Network response not ok');
+        const text = await res.text();
+        return text;
+      }catch(e){ throw e; }
+    }
+
+    /***** UI helpers *****/
+    function el(q){ return document.querySelector(q); }
+    function elAll(q){ return document.querySelectorAll(q); }
+
+    function setStatus(text, spinner=false){
+      const s = el('#stats');
+      s.innerHTML = spinner ? ('<span class="spinner"></span> '+text) : text;
+    }
+
+    function populateTable(list){
+      const tbody = el('#gamesTable tbody'); tbody.innerHTML='';
+      list.forEach(g=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(g.Title)}</td><td>${escapeHtml(g.Platform)}</td><td>${escapeHtml(g.Genre)}</td><td>${escapeHtml(g.Hours||g.TimeRaw)}</td><td>${escapeHtml(g.Interest)}</td><td>${escapeHtml(g.Priority)}</td><td>${g.Completion||0}%</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(s){ if(s==null) return ''; return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    /***** FILTERS UI population *****/
+    function fillFilters(data){
+      const plat = [...new Set(data.map(d=>d.Platform).filter(Boolean))].sort();
+      const genre = [...new Set(data.map(d=>d.Genre).filter(Boolean))].sort();
+      const status = [...new Set(data.map(d=>d.Status).filter(Boolean))].sort();
+
+      const pf = el('#platformFilter'); pf.innerHTML = '<option value="">All platforms</option>';
+      plat.forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; pf.appendChild(o); });
+
+      const gf = el('#genreFilter'); gf.innerHTML='<option value="">All genres</option>';
+      genre.forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; gf.appendChild(o); });
+
+      const sf = el('#statusFilter'); sf.innerHTML='<option value="">All status</option>';
+      status.forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; sf.appendChild(o); });
+
+      updateStats(data);
+    }
+
+    function updateStats(data){
+      setStatus(`Loaded ${data.length} games • Platforms: ${[...new Set(data.map(d=>d.Platform).filter(Boolean))].length} • Genres: ${[...new Set(data.map(d=>d.Genre).filter(Boolean))].length}`);
+    }
+
+    /***** APPLY FILTERS (pipeline) *****/
+    function applyAllFilters(){
+      const pf = el('#platformFilter').value;
+      const gf = el('#genreFilter').value;
+      const sf = el('#statusFilter').value;
+      const pr = el('#priorityFilter').value;
+      const tc = el('#timeCat').value;
+      const onlyStarted = el('#onlyStarted').checked;
+      const q = el('#searchQ').value.trim().toLowerCase();
+
+      FILTERED = DATA.filter(g=>{
+        if(pf && g.Platform !== pf) return false;
+        if(gf && g.Genre !== gf) return false;
+        if(sf && g.Status !== sf) return false;
+        if(pr && g.Priority !== pr) return false;
+        if(tc && g.DurationCat !== tc) return false;
+        if(onlyStarted && !(g.Completion>0)) return false;
+        if(q){
+          if(!( (g.Title||'').toLowerCase().includes(q) || (g.Platform||'').toLowerCase().includes(q) || (g.Genre||'').toLowerCase().includes(q) )) return false;
+        }
+        // exclude wishlisted explicitly
+        if((g.Status||'').toLowerCase().includes('wish')) return false;
+        return true;
+      });
+
+      populateTable(FILTERED);
+      el('#resultArea').classList.add('hidden');
+      setStatus(`Filtered: ${FILTERED.length} / ${DATA.length}`);
+    }
+
+    /***** WEIGHT calc and weighted random draw *****/
+    function computeWeight(game){
+      let weight = 1;
+      const st = (game.Status||'').toLowerCase();
+      if(st.includes('currently playing') || st.includes('playing')) weight += 5;
+      if((game.Priority||'').toLowerCase() === 'high') weight += 4;
+      else if((game.Priority||'').toLowerCase() === 'medium') weight += 2;
+      // completion bonus
+      if(game.Completion > 0) weight += (game.Completion / 20); // 50% -> +2.5
+      // duration tweak
+      if(game.DurationCat === 'Short') weight += 1;
+      if(game.DurationCat === 'Long') weight -= 1;
+      // sanity
+      return Math.max(0.1, weight);
+    }
+
+    function weightedPick(list){
+      if(!list || list.length===0) return null;
+      // compute weights
+      const weights = list.map(g => ({g, w: computeWeight(g)}));
+      const total = weights.reduce((s,it)=>s+it.w,0);
+      let r = Math.random() * total;
+      for(const it of weights){
+        if(r < it.w) return it.g;
+        r -= it.w;
+      }
+      // fallback
+      return weights[Math.floor(Math.random()*weights.length)].g;
+    }
+
+    /***** UI: show result with reason *****/
+    function showResult(g){
+      if(!g) { alert('No game matched the filters. Try clearing some filters.'); return; }
+      el('#resultArea').classList.remove('hidden');
+      el('#resTitle').textContent = g.Title;
+      el('#resMeta').textContent = `${g.Platform} • ${g.Genre} • ${g.Hours||g.TimeRaw}h • ${g.Priority || 'No priority'} • ${g.Completion||0}%`;
+      // build reason
+      const reasons=[];
+      if((g.Status||'').toLowerCase().includes('playing')) reasons.push('Already playing → finish it');
+      if((g.Priority||'').toLowerCase()==='high') reasons.push('High priority');
+      if(g.Completion>0) reasons.push(`Completion ${g.Completion}% → finish progress`);
+      if(g.DurationCat==='Short') reasons.push('Short playtime → quick win');
+      const reason = reasons.length ? reasons.join(' · ') : 'Chosen randomly based on filters & weights';
+      el('#resReason').textContent = reason;
+      // small animation
+      el('#resBadge').textContent = 'Picked';
+      el('#resBadge').style.background = 'linear-gradient(90deg,var(--accent),var(--accent-2))';
+      el('#resBadge').style.color = '#fff';
+      // scroll into view
+      setTimeout(()=> el('#resultArea').scrollIntoView({behavior:'smooth', block:'center'}), 120);
+    }
+
+    /***** EXPORT filtered list to CSV *****/
+    function exportCSV(list){
+      if(!list || list.length===0){ alert('No rows to export'); return; }
+      const header = ['Title','Platform','Genre','Hours','Interest','Priority','Status','Completion'];
+      const lines = [header.join(',')];
+      list.forEach(r=>{
+        const row = [
+          csvSafe(r.Title), csvSafe(r.Platform), csvSafe(r.Genre), csvSafe(r.Hours||r.TimeRaw),
+          csvSafe(r.Interest), csvSafe(r.Priority), csvSafe(r.Status), csvSafe(r.Completion)
+        ];
+        lines.push(row.join(','));
+      });
+      const blob = new Blob([lines.join('\\n')], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'filtered_games_export.csv'; document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+    function csvSafe(v){ if(v==null) return '""'; return '"'+(''+v).replace(/"/g,'""')+'"'; }
+
+    /***** MAIN actions *****/
+    async function loadAndParse(url){
+      try{
+        setStatus('Loading data...', true);
+        const text = await fetchSheetCsv(url);
+        const rows = parseCSV(text);
+        if(rows.length === 0) throw new Error('Sheet appears empty or non-CSV');
+        RAW = rows;
+        DATA = normalizeRows(rows);
+        FILTERED = DATA.slice();
+        fillFilters(DATA);
+        populateTable(FILTERED);
+        setStatus(`Loaded ${DATA.length} rows`);
+      }catch(err){
+        console.error(err);
+        setStatus('Error: ' + (err.message || err));
+        alert('Failed to load sheet. Check URL and share settings.');
+      }
+    }
+
+    /***** EVENTS wiring *****/
+    document.getElementById('loadBtn').addEventListener('click', ()=> {
+      const url = document.getElementById('sheetUrl').value.trim();
+      if(!url) return alert('Paste the sheet CSV export URL');
+      loadAndParse(url);
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', ()=>{
+      const url = document.getElementById('sheetUrl').value.trim();
+      loadAndParse(url);
+    });
+
+    ['platformFilter','genreFilter','statusFilter','priorityFilter','timeCat','onlyStarted','searchQ'].forEach(id=>{
+      const elM = document.getElementById(id);
+      if(elM) elM.addEventListener('input', applyAllFilters);
+      if(elM) elM.addEventListener('change', applyAllFilters);
+    });
+
+    document.getElementById('rollBtn').addEventListener('click', async ()=>{
+      // apply filters first (just in case)
+      applyAllFilters();
+      if(FILTERED.length === 0) return alert('No games match the current filters');
+      // spinning animation simulated
+      const rollBtn = el('#rollBtn');
+      rollBtn.disabled = true; const old = rollBtn.textContent; rollBtn.textContent = 'Rolling...';
+      // a little fake spin: pick quickly multiple times to create suspense
+      for(let i=0;i<12;i++){
+        const candidate = weightedPick(FILTERED);
+        el('#resTitle').textContent = candidate.Title;
+        await new Promise(r=>setTimeout(r, 40 + i*20));
+      }
+      const final = weightedPick(FILTERED);
+      showResult(final);
+      rollBtn.disabled = false; rollBtn.textContent = old;
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', ()=> exportCSV(FILTERED));
+
+    document.getElementById('searchQ').addEventListener('input', applyAllFilters);
+
+    // load default on start (auto)
+    window.addEventListener('DOMContentLoaded', ()=> {
+      // try auto-load default sheet (silently)
+      loadAndParse(DEFAULT_SHEET_CSV);
+    });
+  </script>
+</body>
+</html>
